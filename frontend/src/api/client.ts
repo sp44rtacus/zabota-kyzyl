@@ -13,7 +13,11 @@ import {
   Role
 } from '../types';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000/api/v1';
+const API_BASE = import.meta.env.VITE_API_BASE || (
+  typeof window !== 'undefined' && window.location.port === '5173'
+    ? 'http://localhost:8000/api/v1'
+    : '/api/v1'
+);
 
 class ApiClient {
   private token: string | null = null;

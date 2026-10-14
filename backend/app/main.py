@@ -1,7 +1,9 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from pathlib import Path
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from app.core.config import settings
 from app.core.database import Base, engine, SessionLocal
@@ -65,21 +67,37 @@ app.add_middleware(
 # Раздача статических файлов (аудиозаписи и фотографии До/После)
 app.mount("/uploads", StaticFiles(directory=str(settings.UPLOAD_DIR)), name="uploads")
 
-# Подключение маршрутизаторов
+# Подключение маршрутизаторов API
 app.include_router(auth.router, prefix=settings.API_V1_STR)
 app.include_router(public.router, prefix=settings.API_V1_STR)
 app.include_router(volunteers.router, prefix=settings.API_V1_STR)
 app.include_router(admin.router, prefix=settings.API_V1_STR)
 app.include_router(analytics.router, prefix=settings.API_V1_STR)
 
+# Раздача собранного SPA фронтенда (Unified Single-Service Hosting)
+frontend_dist = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 
-@app.get("/", tags=["Служебные"])
-def root_status():
-    """Проверка доступности сервиса."""
-    return {
-        "status": "online",
-        "service": settings.PROJECT_NAME,
-        "version": settings.VERSION,
-        "docs_url": "/docs",
-        "municipality": settings.MUNICIPALITY_NAME
-    }
+if (frontend_dist / "index.html").exists():
+    if (frontend_dist / "assets").exists():
+        app.mount("/assets", StaticFiles(directory=str(frontend_dist / "assets")), name="assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_spa(full_path: str):
+        if full_path.startswith(("api", "docs", "redoc", "openapi.json", "uploads")):
+            raise HTTPException(status_code=404, detail="Not Found")
+        
+        file_path = frontend_dist / full_path
+        if file_path.is_file():
+            return FileResponse(file_path)
+        return FileResponse(frontend_dist / "index.html")
+else:
+    @app.get("/", tags=["Служебные"])
+    def root_status():
+        """Проверка доступности сервиса."""
+        return {
+            "status": "online",
+            "service": settings.PROJECT_NAME,
+            "version": settings.VERSION,
+            "docs_url": "/docs",
+            "municipality": settings.MUNICIPALITY_NAME
+        }
