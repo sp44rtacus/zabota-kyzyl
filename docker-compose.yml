@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:///./zabota_kyzyl.db
+      - SECRET_KEY=kyzyl-production-secret-key-2026
+    volumes:
+      - ./backend/zabota_kyzyl.db:/app/zabota_kyzyl.db
+      - ./backend/app/uploads:/app/app/uploads
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
