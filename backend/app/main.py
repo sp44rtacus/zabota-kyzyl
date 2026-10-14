@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
@@ -75,7 +76,23 @@ app.include_router(admin.router, prefix=settings.API_V1_STR)
 app.include_router(analytics.router, prefix=settings.API_V1_STR)
 
 # Раздача собранного SPA фронтенда (Unified Single-Service Hosting)
-frontend_dist = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+def find_frontend_dist() -> Path:
+    env_dist = os.getenv("FRONTEND_DIST")
+    if env_dist and Path(env_dist).exists():
+        return Path(env_dist)
+    
+    candidates = [
+        Path(__file__).resolve().parent.parent.parent / "frontend" / "dist",
+        Path(__file__).resolve().parent.parent / "frontend" / "dist",
+        Path.cwd() / "frontend" / "dist",
+        Path("/app/frontend/dist"),
+    ]
+    for candidate in candidates:
+        if (candidate / "index.html").exists():
+            return candidate
+    return candidates[0]
+
+frontend_dist = find_frontend_dist()
 
 if (frontend_dist / "index.html").exists():
     if (frontend_dist / "assets").exists():

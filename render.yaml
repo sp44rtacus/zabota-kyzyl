@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: zabota-kyzyl
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: frankfurt
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        value: sqlite:///./zabota_kyzyl.db
+      - key: MUNICIPALITY_NAME
+        value: "Департамент по социальной политике мэрии города Кызыла"
