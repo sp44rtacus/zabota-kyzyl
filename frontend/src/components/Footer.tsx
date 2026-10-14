@@ -1,5 +1,5 @@
 import React from 'react';
-import { HeartHandshake, Phone, MapPin, ShieldCheck, Clock } from 'lucide-react';
+import { HeartHandshake, Phone, MapPin, ShieldCheck, Clock, FileCheck } from 'lucide-react';
 
 export const Footer: React.FC = () => {
   return (
@@ -59,13 +59,20 @@ export const Footer: React.FC = () => {
             </div>
           </div>
 
-          {/* Колонка 4: Для защиты проекта */}
+          {/* Колонка 4: Правовая база и муниципальная программа */}
           <div className="space-y-3">
-            <h4 className="text-xs font-bold text-white uppercase tracking-wider">Учебный проект</h4>
-            <div className="p-3 rounded-lg bg-slate-800/80 border border-slate-700 text-xs space-y-1.5">
-              <div className="text-slate-300 font-medium">Отчет по производственной практике</div>
-              <div className="text-[11px] text-slate-400">Специальность: «Информационные системы и программирование»</div>
-              <div className="text-[11px] text-emerald-400 font-semibold">Готов к защите перед аттестационной комиссией</div>
+            <h4 className="text-xs font-bold text-white uppercase tracking-wider">Правовая основа</h4>
+            <div className="p-3.5 rounded-lg bg-slate-800/80 border border-slate-700 text-xs space-y-2">
+              <div className="flex items-start gap-2">
+                <FileCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <span className="text-slate-300 leading-tight">ФЗ № 135 «О добровольчестве (волонтерстве) в РФ»</span>
+              </div>
+              <div className="text-[11px] text-slate-400 leading-relaxed">
+                Муниципальная программа социальной поддержки населения и мотивации волонтеров городского округа «Город Кызыл».
+              </div>
+              <div className="text-[10px] text-emerald-400 font-semibold pt-1 border-t border-slate-700">
+                Официальный реестр волонтерских книжек и льгот
+              </div>
             </div>
           </div>
         </div>

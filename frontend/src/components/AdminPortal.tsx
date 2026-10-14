@@ -12,14 +12,17 @@ import {
   Users, 
   ShieldCheck,
   Ban,
-  Clock
+  Clock,
+  MessageSquare,
+  Send,
+  Phone
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { Application } from '../types';
+import { Application, TaskMessage } from '../types';
 import { api } from '../api/client';
 
 export const AdminPortal: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'kanban' | 'volunteers'>('kanban');
+  const [activeTab, setActiveTab] = useState<'kanban' | 'chats' | 'volunteers'>('kanban');
 
   // Данные Канбан
   const [columns, setColumns] = useState<{
@@ -47,6 +50,12 @@ export const AdminPortal: React.FC = () => {
   // Назначение волонтера в 1 клик
   const [assignModalApp, setAssignModalApp] = useState<Application | null>(null);
   const [volunteersList, setVolunteersList] = useState<any[]>([]);
+
+  // Чат инспектора с волонтером
+  const [chatApp, setChatApp] = useState<Application | null>(null);
+  const [chatMessages, setChatMessages] = useState<TaskMessage[]>([]);
+  const [newInspectorMsg, setNewInspectorMsg] = useState('');
+  const [sendingChat, setSendingChat] = useState(false);
 
   useEffect(() => {
     loadKanban();
@@ -89,8 +98,39 @@ export const AdminPortal: React.FC = () => {
       const details = await api.getVerificationDetails(assignId);
       setVerificationData(details);
       setInspectorHours(details.hours_awarded || 2);
+      // Загрузка сообщений чата по заявке в окно верификации
+      const msgs = await api.getChat(details.application.id);
+      setChatMessages(msgs);
     } catch (err) {
       alert("Ошибка загрузки данных верификации");
+    }
+  };
+
+  const openChatModal = async (app: Application) => {
+    setChatApp(app);
+    try {
+      const msgs = await api.getChat(app.id);
+      setChatMessages(msgs);
+    } catch (err) {
+      console.error("Ошибка загрузки чата:", err);
+    }
+  };
+
+  const handleSendInspectorMsg = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const targetAppId = chatApp?.id || verificationData?.application?.id;
+    if (!targetAppId || !newInspectorMsg.trim()) return;
+
+    setSendingChat(true);
+    try {
+      await api.sendMessage(targetAppId, newInspectorMsg.trim());
+      setNewInspectorMsg('');
+      const msgs = await api.getChat(targetAppId);
+      setChatMessages(msgs);
+    } catch (err) {
+      console.error("Ошибка отправки:", err);
+    } finally {
+      setSendingChat(false);
     }
   };
 
@@ -152,6 +192,13 @@ export const AdminPortal: React.FC = () => {
     }
   };
 
+  // Все заявки с назначенными волонтерами для вкладки "Чаты"
+  const allActiveWithVolunteers = [
+    ...columns.in_progress,
+    ...columns.review,
+    ...columns.completed
+  ];
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       {/* Шапка рабочего стола инспектора */}
@@ -165,14 +212,14 @@ export const AdminPortal: React.FC = () => {
             Панель управления и модерации АИС «Забота»
           </h1>
           <p className="text-xs sm:text-sm text-slate-200 mt-1">
-            Модерация новых обращений жителей, контроль исполнения заявок на Канбан-доске и сплит-проверка фотоотчетов.
+            Модерация новых обращений жителей, координация волонтеров в чате и сплит-проверка фотоотчетов.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
             onClick={() => setActiveTab('kanban')}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
               activeTab === 'kanban' ? 'bg-white text-municipal-800 shadow' : 'bg-white/10 text-white hover:bg-white/20'
             }`}
           >
@@ -181,8 +228,18 @@ export const AdminPortal: React.FC = () => {
           </button>
 
           <button
+            onClick={() => setActiveTab('chats')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+              activeTab === 'chats' ? 'bg-white text-municipal-800 shadow' : 'bg-white/10 text-white hover:bg-white/20'
+            }`}
+          >
+            <MessageSquare className="w-4 h-4 text-emerald-400" />
+            <span>Чаты с волонтерами ({allActiveWithVolunteers.length})</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('volunteers')}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
               activeTab === 'volunteers' ? 'bg-white text-municipal-800 shadow' : 'bg-white/10 text-white hover:bg-white/20'
             }`}
           >
@@ -192,11 +249,11 @@ export const AdminPortal: React.FC = () => {
         </div>
       </div>
 
-      {/* КАНБАН-ДОСКА ПО ТЗ 5.3 */}
+      {/* КАНБАН-ДОСКА */}
       {activeTab === 'kanban' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between text-xs text-slate-500 font-semibold px-1">
-            <span>Рабочий стол заявок (Канбан-колонки)</span>
+            <span>Канбан-доска текущих обращений граждан Кызыла</span>
             <button onClick={loadKanban} className="text-municipal-700 hover:underline">
               Обновить доску
             </button>
@@ -238,7 +295,7 @@ export const AdminPortal: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Кнопки модерации по ТЗ 5.3 */}
+                    {/* Кнопки модерации */}
                     <div className="pt-2 border-t border-slate-100 flex flex-col gap-1.5">
                       <div className="flex gap-1.5">
                         <button
@@ -262,7 +319,7 @@ export const AdminPortal: React.FC = () => {
                         className="w-full py-1.5 bg-municipal-700 hover:bg-municipal-800 text-white text-[11px] font-bold rounded-lg transition flex items-center justify-center gap-1"
                       >
                         <UserPlus className="w-3.5 h-3.5" />
-                        <span>Назначить волонтера в 1 клик</span>
+                        <span>Назначить волонтера</span>
                       </button>
                     </div>
                   </div>
@@ -270,7 +327,7 @@ export const AdminPortal: React.FC = () => {
               </div>
             </div>
 
-            {/* КОЛОНКА 2: ОДОБРЕННЫЕ (ПОИСК ВОЛОНТЕРА) */}
+            {/* КОЛОНКА 2: ОДОБРЕННЫЕ (В ЛЕНТЕ) */}
             <div className="bg-slate-100/90 rounded-2xl p-4 border border-slate-200 space-y-3">
               <div className="flex items-center justify-between font-bold text-xs uppercase tracking-wider text-slate-700 pb-2 border-b border-slate-200">
                 <span className="flex items-center gap-1.5">
@@ -316,31 +373,43 @@ export const AdminPortal: React.FC = () => {
               </div>
 
               <div className="space-y-3 max-h-[650px] overflow-y-auto pr-1">
-                {columns.in_progress.map(app => (
-                  <div key={app.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-2.5">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-extrabold text-slate-900">{app.uin}</span>
-                      <span className="text-[10px] bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full font-bold">
-                        Исполняется
-                      </span>
-                    </div>
+                {columns.in_progress.map(app => {
+                  const vol = app.volunteers && app.volunteers.length > 0 ? app.volunteers[0] : null;
+                  return (
+                    <div key={app.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-2.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-extrabold text-slate-900">{app.uin}</span>
+                        <span className="text-[10px] bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full font-bold">
+                          Исполняется
+                        </span>
+                      </div>
 
-                    <div className="text-xs space-y-1">
-                      <div className="font-semibold text-slate-800">{app.applicant_name}</div>
-                      <div className="text-slate-500">{app.address}</div>
-                      
-                      {app.volunteers && app.volunteers.length > 0 && (
-                        <div className="p-2 rounded bg-purple-50/60 border border-purple-100 text-[11px] text-purple-900 mt-2">
-                          <b>Исполнитель:</b> {app.volunteers[0].full_name}
-                        </div>
-                      )}
+                      <div className="text-xs space-y-1">
+                        <div className="font-semibold text-slate-800">{app.applicant_name}</div>
+                        <div className="text-slate-500">{app.address}</div>
+                        
+                        {vol && (
+                          <div className="p-2 rounded bg-purple-50 border border-purple-100 text-[11px] text-purple-900 mt-1">
+                            <b>Волонтер:</b> {vol.full_name} ({vol.phone})
+                          </div>
+                        )}
+                      </div>
+
+                      {/* ПРЯМАЯ КНОПКА ЧАТА С ВОЛОНТЕРОМ */}
+                      <button
+                        onClick={() => openChatModal(app)}
+                        className="w-full py-1.5 bg-blue-50 hover:bg-blue-100 text-municipal-700 text-[11px] font-bold rounded-lg border border-blue-200 transition flex items-center justify-center gap-1.5"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Чат с волонтером</span>
+                      </button>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
-            {/* КОЛОНКА 4: ПРОВЕРКА ОТЧЕТОВ ПО ТЗ 5.3 */}
+            {/* КОЛОНКА 4: ПРОВЕРКА ОТЧЕТОВ */}
             <div className="bg-slate-100/90 rounded-2xl p-4 border border-amber-300 ring-2 ring-amber-100 space-y-3">
               <div className="flex items-center justify-between font-bold text-xs uppercase tracking-wider text-amber-900 pb-2 border-b border-amber-200">
                 <span className="flex items-center gap-1.5">
@@ -371,14 +440,23 @@ export const AdminPortal: React.FC = () => {
                         )}
                       </div>
 
-                      {firstVol && (
+                      <div className="space-y-1.5 pt-1">
+                        {firstVol && (
+                          <button
+                            onClick={() => openVerificationModal(firstVol.assignment_id)}
+                            className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-slate-900 font-black text-xs rounded-lg shadow-sm transition flex items-center justify-center gap-1.5"
+                          >
+                            <span>Сплит-экран проверки</span>
+                          </button>
+                        )}
                         <button
-                          onClick={() => openVerificationModal(firstVol.assignment_id)}
-                          className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-slate-900 font-black text-xs rounded-lg shadow-sm transition flex items-center justify-center gap-1.5"
+                          onClick={() => openChatModal(app)}
+                          className="w-full py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold rounded-lg transition flex items-center justify-center gap-1"
                         >
-                          <span>Сплит-экран проверки</span>
+                          <MessageSquare className="w-3 h-3 text-slate-500" />
+                          <span>История переписки</span>
                         </button>
-                      )}
+                      </div>
                     </div>
                   );
                 })}
@@ -405,6 +483,13 @@ export const AdminPortal: React.FC = () => {
                     </div>
                     <div className="text-xs text-slate-700 font-medium">{app.applicant_name}</div>
                     <div className="text-[11px] text-slate-400">{app.category_title}</div>
+                    <button
+                      onClick={() => openChatModal(app)}
+                      className="text-[10px] text-blue-600 hover:underline pt-1 flex items-center gap-1"
+                    >
+                      <MessageSquare className="w-3 h-3" />
+                      <span>Открыть архив чата</span>
+                    </button>
                   </div>
                 ))}
               </div>
@@ -413,9 +498,60 @@ export const AdminPortal: React.FC = () => {
         </div>
       )}
 
-      {/* РЕЕСТР ВОЛОНТЕРОВ ПО ТЗ 5.3 */}
+      {/* ВКЛАДКА 2: ВСЕ ЧАТЫ С ВОЛОНТЕРАМИ */}
+      {activeTab === 'chats' && (
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-md p-6 space-y-6">
+          <div className="border-b pb-4">
+            <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-emerald-600" />
+              <span>Центр оперативной связи инспекторов с волонтерами г. Кызыла</span>
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Здесь отображаются все активные диалоги по заявкам. Инспектор может мгновенно ответить волонтеру, согласовать инвентарь или проконсультировать.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {allActiveWithVolunteers.map(app => {
+              const vol = app.volunteers && app.volunteers.length > 0 ? app.volunteers[0] : null;
+              return (
+                <div
+                  key={app.id}
+                  onClick={() => openChatModal(app)}
+                  className="p-4 rounded-2xl border border-slate-200 hover:border-municipal-600 hover:shadow-md cursor-pointer transition space-y-3 bg-slate-50/50"
+                >
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-black text-slate-900">{app.uin}</span>
+                    <span className="text-[10px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                      {app.status === 'in_progress' ? 'В работе' : (app.status === 'review' ? 'На проверке' : 'Завершено')}
+                    </span>
+                  </div>
+
+                  <div className="text-xs space-y-1">
+                    <div className="text-slate-600 font-medium">Заявитель: <b>{app.applicant_name}</b></div>
+                    <div className="text-slate-500">{app.district_name} • {app.address}</div>
+                    {vol && (
+                      <div className="p-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-emerald-800 flex items-center justify-between">
+                        <span>Волонтер: {vol.full_name}</span>
+                        <Phone className="w-3.5 h-3.5 text-slate-400" />
+                      </div>
+                    )}
+                  </div>
+
+                  <button className="w-full py-2 bg-municipal-700 hover:bg-municipal-800 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center justify-center gap-1.5">
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    <span>Открыть диалог</span>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ВКЛАДКА 3: РЕЕСТР ВОЛОНТЕРОВ */}
       {activeTab === 'volunteers' && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-md p-6 space-y-4">
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-md p-6 space-y-4">
           <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
             <Users className="w-5 h-5 text-municipal-700" />
             <span>Городской реестр волонтеров и учет социальной практики</span>
@@ -474,9 +610,80 @@ export const AdminPortal: React.FC = () => {
         </div>
       )}
 
-      {/* МОДУЛЬ ПРОВЕРКИ ФОТООТЧЕТА (СПЛИТ-ЭКРАН SIDE-BY-SIDE ПО ТЗ 5.3) */}
+      {/* МОДАЛЬНОЕ ОКНО ЧАТА ИНСПЕКТОРА С ВОЛОНТЕРОМ */}
+      {chatApp && (
+        <div className="fixed inset-0 z-[10000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-100 space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div>
+                <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">
+                  Оперативный чат с волонтером
+                </span>
+                <h3 className="text-base font-black text-slate-900">
+                  Заявка {chatApp.uin} • {chatApp.applicant_name}
+                </h3>
+              </div>
+              <button onClick={() => setChatApp(null)} className="text-slate-400 hover:text-slate-600 font-bold text-lg p-1">
+                ✕
+              </button>
+            </div>
+
+            <div className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1">
+              <div><b>Адрес:</b> {chatApp.address} ({chatApp.district_name})</div>
+              <div><b>Услуга:</b> {chatApp.category_title}</div>
+            </div>
+
+            {/* Окно сообщений */}
+            <div className="h-64 overflow-y-auto space-y-3 p-3 bg-slate-50/70 rounded-2xl border border-slate-200">
+              {chatMessages.length === 0 ? (
+                <div className="text-center text-xs text-slate-400 py-12">
+                  В этом чате пока нет сообщений. Напишите волонтеру первое указание.
+                </div>
+              ) : (
+                chatMessages.map(msg => (
+                  <div
+                    key={msg.id}
+                    className={`p-3 rounded-xl max-w-sm text-xs shadow-sm ${
+                      msg.sender_role === 'inspector' || msg.sender_role === 'director'
+                        ? 'ml-auto bg-municipal-700 text-white rounded-br-none'
+                        : 'mr-auto bg-white border border-slate-200 text-slate-800 rounded-bl-none'
+                    }`}
+                  >
+                    <div className="text-[10px] font-semibold opacity-75 mb-1 flex items-center justify-between gap-3">
+                      <span>{msg.sender_name} ({msg.sender_role})</span>
+                      <span>{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                    <div>{msg.message}</div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Форма отправки сообщения от инспектора */}
+            <form onSubmit={handleSendInspectorMsg} className="flex gap-2">
+              <input
+                type="text"
+                value={newInspectorMsg}
+                onChange={(e) => setNewInspectorMsg(e.target.value)}
+                placeholder="Напишите ответ волонтеру..."
+                className="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-municipal-600"
+              />
+              <button
+                type="submit"
+                disabled={sendingChat}
+                className="px-5 py-2.5 rounded-xl bg-municipal-700 hover:bg-municipal-800 text-white text-xs font-bold transition flex items-center gap-1.5"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Отправить</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* СПЛИТ-ЭКРАН ВЕРИФИКАЦИИ ФОТООТЧЕТА С ИНТЕГРИРОВАННЫМ ЧАТОМ */}
       {selectedReviewAssignId && verificationData && (
-        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[10000] bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto space-y-6 animate-in zoom-in-95">
             <div className="flex items-center justify-between pb-4 border-b border-slate-200">
               <div>
@@ -498,7 +705,7 @@ export const AdminPortal: React.FC = () => {
               </button>
             </div>
 
-            {/* СПЛИТ-ЭКРАН ФОТО ДО / ПОСЛЕ ПО ТЗ */}
+            {/* СПЛИТ-ЭКРАН ФОТО ДО / ПОСЛЕ */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <div className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
@@ -537,7 +744,7 @@ export const AdminPortal: React.FC = () => {
               </div>
             </div>
 
-            {/* Аудиозапись заявителя (если была) по ТЗ */}
+            {/* Аудиозапись заявителя */}
             {verificationData.application.audio_url && (
               <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2 text-blue-900 font-bold">
@@ -558,7 +765,27 @@ export const AdminPortal: React.FC = () => {
               </div>
             </div>
 
-            {/* Форма резолюции инспектора */}
+            {/* Встроенный чат координации в модальном окне */}
+            <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50/50 space-y-3">
+              <div className="text-xs font-bold text-slate-800 flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-blue-600" />
+                <span>Переписка инспектора с волонтером по данной задаче:</span>
+              </div>
+              <div className="h-36 overflow-y-auto space-y-2 bg-white p-3 rounded-xl border border-slate-200">
+                {chatMessages.length === 0 ? (
+                  <div className="text-center text-xs text-slate-400 py-4">Сообщений в чате пока нет.</div>
+                ) : (
+                  chatMessages.map(m => (
+                    <div key={m.id} className="text-xs">
+                      <span className="font-bold text-slate-800">{m.sender_name}: </span>
+                      <span className="text-slate-600">{m.message}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Резолюция инспектора */}
             <div className="space-y-3 pt-2">
               <div className="flex items-center gap-4">
                 <label className="text-xs font-bold text-slate-700 uppercase">
@@ -611,9 +838,9 @@ export const AdminPortal: React.FC = () => {
         </div>
       )}
 
-      {/* МОДАЛЬНОЕ ОКНО НАЗНАЧЕНИЯ ВОЛОНТЕРА В 1 КЛИК */}
+      {/* МОДАЛЬНОЕ ОКНО НАЗНАЧЕНИЯ ВОЛОНТЕРА */}
       {assignModalApp && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[10000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b">
               <h3 className="text-base font-bold text-slate-900">

@@ -246,7 +246,7 @@ export const AnalyticsPortal: React.FC = () => {
           </div>
         </div>
 
-        <div className="h-[450px] rounded-2xl overflow-hidden border border-slate-200 shadow-inner">
+        <div className="h-[450px] rounded-2xl overflow-hidden border border-slate-200 shadow-inner relative z-0 isolate">
           <MapContainer
             center={[51.7250, 94.4378]}
             zoom={12}

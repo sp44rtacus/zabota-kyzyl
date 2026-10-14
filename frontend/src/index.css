@@ -11,6 +11,21 @@
   }
 }
 
+/* Ограничение z-index карты Leaflet, чтобы она никогда не перекрывала шапку */
+.leaflet-container {
+  z-index: 1 !important;
+  isolation: isolate;
+}
+
+.leaflet-pane {
+  z-index: 2 !important;
+}
+
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 5 !important;
+}
+
 /* Режим для слабовидящих (ГОСТ Р 52872-2019) */
 body.accessibility-mode {
   font-size: 19px !important;

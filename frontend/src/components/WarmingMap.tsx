@@ -120,7 +120,7 @@ export const WarmingMap: React.FC = () => {
         </div>
 
         {/* Интерактивная карта (правая колонка) */}
-        <div className="lg:col-span-2 order-1 lg:order-2 h-[450px] lg:h-[600px] rounded-2xl overflow-hidden border border-slate-200 shadow-md">
+        <div className="lg:col-span-2 order-1 lg:order-2 h-[450px] lg:h-[600px] rounded-2xl overflow-hidden border border-slate-200 shadow-md relative z-0 isolate">
           <MapContainer
             center={[51.7197, 94.4378]}
             zoom={12}
