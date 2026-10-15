@@ -88,34 +88,41 @@ def get_public_counters(db: Session = Depends(get_db)) -> Any:
 @router.post("/applications", response_model=ApplicationResponse, summary="Подача заявки от жителя (JSON)")
 def create_application_json(app_in: ApplicationCreate, db: Session = Depends(get_db)) -> Any:
     """Создание заявки на адресную помощь через стандартную веб-форму."""
-    district = db.query(District).filter(District.id == app_in.district_id).first()
+    district_id = app_in.district_id or 1
+    district = db.query(District).filter(District.id == district_id).first()
     if not district:
-        raise HTTPException(status_code=400, detail="Указанный микрорайон не найден")
+        district = db.query(District).first()
+        district_id = district.id if district else 1
 
-    category = db.query(Category).filter(Category.id == app_in.category_id).first()
+    category_id = app_in.category_id or 1
+    category = db.query(Category).filter(Category.id == category_id).first()
     if not category:
-        raise HTTPException(status_code=400, detail="Указанная категория помощи не найдена")
+        category = db.query(Category).first()
+        category_id = category.id if category else 1
 
     uin = generate_uin(db)
     
     # Координаты: берем переданные или центроид района
-    lat = app_in.lat or district.lat
-    lng = app_in.lng or district.lng
+    lat = app_in.lat or (district.lat if district else 51.7197)
+    lng = app_in.lng or (district.lng if district else 94.4378)
+
+    desc = (app_in.description or "").strip() or "Требуется адресная социальная помощь"
+    benefit = (app_in.benefit_category or "").strip() or "Гражданин в трудной жизненной ситуации"
 
     new_app = Application(
         uin=uin,
-        applicant_name=app_in.applicant_name.strip(),
-        phone=app_in.phone.strip(),
+        applicant_name=app_in.applicant_name.strip() if app_in.applicant_name else "Заявитель",
+        phone=app_in.phone.strip() if app_in.phone else "+7 (923) 000-00-00",
         is_third_party=app_in.is_third_party,
         third_party_info=app_in.third_party_info.strip() if app_in.third_party_info else None,
-        benefit_category=app_in.benefit_category.strip(),
-        district_id=app_in.district_id,
-        address=app_in.address.strip(),
-        category_id=app_in.category_id,
-        description=app_in.description.strip(),
+        benefit_category=benefit,
+        district_id=district_id,
+        address=app_in.address.strip() if app_in.address else "г. Кызыл",
+        category_id=category_id,
+        description=desc,
         is_emergency=app_in.is_emergency,
         status="new",
-        required_volunteers=app_in.required_volunteers,
+        required_volunteers=app_in.required_volunteers or 1,
         lat=lat,
         lng=lng
     )
@@ -127,13 +134,13 @@ def create_application_json(app_in: ApplicationCreate, db: Session = Depends(get
 
 @router.post("/applications/with-audio", response_model=ApplicationResponse, summary="Подача заявки с аудиозаписью")
 async def create_application_with_audio(
-    applicant_name: str = Form(...),
-    phone: str = Form(...),
-    benefit_category: str = Form(...),
-    district_id: int = Form(...),
-    address: str = Form(...),
-    category_id: int = Form(...),
-    description: str = Form(...),
+    applicant_name: str = Form("Заявитель"),
+    phone: str = Form("+7 (923) 000-00-00"),
+    benefit_category: Optional[str] = Form("Гражданин в трудной жизненной ситуации"),
+    district_id: Optional[int] = Form(1),
+    address: Optional[str] = Form("г. Кызыл"),
+    category_id: Optional[int] = Form(1),
+    description: Optional[str] = Form(None),
     is_emergency: bool = Form(False),
     is_third_party: bool = Form(False),
     third_party_info: Optional[str] = Form(None),
@@ -144,9 +151,17 @@ async def create_application_with_audio(
     db: Session = Depends(get_db)
 ) -> Any:
     """Создание заявки с возможностью прикрепления голосового сообщения."""
-    district = db.query(District).filter(District.id == district_id).first()
+    district_id_val = district_id or 1
+    district = db.query(District).filter(District.id == district_id_val).first()
     if not district:
-        raise HTTPException(status_code=400, detail="Указанный микрорайон не найден")
+        district = db.query(District).first()
+        district_id_val = district.id if district else 1
+
+    category_id_val = category_id or 1
+    category = db.query(Category).filter(Category.id == category_id_val).first()
+    if not category:
+        category = db.query(Category).first()
+        category_id_val = category.id if category else 1
 
     uin = generate_uin(db)
     audio_url = None
@@ -163,23 +178,26 @@ async def create_application_with_audio(
 
         audio_url = f"/uploads/audio/{file_name}"
 
+    desc = (description or "").strip() or ("Голосовое обращение жителя" if audio_url else "Требуется адресная социальная помощь")
+    benefit = (benefit_category or "").strip() or "Гражданин в трудной жизненной ситуации"
+
     app = Application(
         uin=uin,
-        applicant_name=applicant_name.strip(),
-        phone=phone.strip(),
+        applicant_name=applicant_name.strip() if applicant_name else "Заявитель",
+        phone=phone.strip() if phone else "+7 (923) 000-00-00",
         is_third_party=is_third_party,
         third_party_info=third_party_info.strip() if third_party_info else None,
-        benefit_category=benefit_category.strip(),
-        district_id=district_id,
-        address=address.strip(),
-        category_id=category_id,
-        description=description.strip(),
+        benefit_category=benefit,
+        district_id=district_id_val,
+        address=address.strip() if address else "г. Кызыл",
+        category_id=category_id_val,
+        description=desc,
         audio_url=audio_url,
         is_emergency=is_emergency,
         status="new",
-        required_volunteers=required_volunteers,
-        lat=lat or district.lat,
-        lng=lng or district.lng
+        required_volunteers=required_volunteers or 1,
+        lat=lat or (district.lat if district else 51.7197),
+        lng=lng or (district.lng if district else 94.4378)
     )
     db.add(app)
     db.commit()

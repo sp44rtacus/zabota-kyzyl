@@ -14,15 +14,15 @@ class CategoryResponse(BaseModel):
 
 
 class ApplicationCreate(BaseModel):
-    applicant_name: str = Field(..., min_length=2, max_length=255, description="ФИО заявителя")
-    phone: str = Field(..., min_length=6, max_length=20, description="Телефон для связи")
+    applicant_name: str = Field(..., min_length=1, max_length=255, description="ФИО заявителя")
+    phone: str = Field(..., min_length=3, max_length=50, description="Телефон для связи")
     is_third_party: bool = Field(default=False, description="Подано за соседа/родственника")
     third_party_info: Optional[str] = Field(default=None, description="Данные того, кто подал")
-    benefit_category: str = Field(..., description="Категория льготы (Ветеран, Инвалид, СВО и др.)")
-    district_id: int = Field(..., description="ID микрорайона Кызыла")
-    address: str = Field(..., min_length=5, description="Улица, дом, квартира")
-    category_id: int = Field(..., description="ID категории помощи")
-    description: str = Field(..., min_length=5, description="Подробное описание ситуации")
+    benefit_category: Optional[str] = Field(default="Гражданин в трудной жизненной ситуации", description="Категория льготы")
+    district_id: Optional[int] = Field(default=1, description="ID микрорайона Кызыла")
+    address: str = Field(..., min_length=1, description="Улица, дом, квартира")
+    category_id: Optional[int] = Field(default=1, description="ID категории помощи")
+    description: Optional[str] = Field(default="Требуется адресная социальная помощь", description="Подробное описание ситуации")
     is_emergency: bool = Field(default=False, description="Флаг экстренной SOS помощи")
     required_volunteers: int = Field(default=1, ge=1, le=10)
     lat: Optional[float] = None

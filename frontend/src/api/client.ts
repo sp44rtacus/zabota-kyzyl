@@ -57,7 +57,18 @@ class ApiClient {
       let errorMsg = `Ошибка сервера (${res.status})`;
       try {
         const errorData = await res.json();
-        errorMsg = errorData.detail || errorMsg;
+        if (typeof errorData.detail === 'string') {
+          errorMsg = errorData.detail;
+        } else if (Array.isArray(errorData.detail)) {
+          errorMsg = errorData.detail.map((d: any) => {
+            const field = d.loc ? d.loc[d.loc.length - 1] : '';
+            return `${field}: ${d.msg}`;
+          }).join('; ');
+        } else if (typeof errorData.detail === 'object') {
+          errorMsg = JSON.stringify(errorData.detail);
+        } else if (errorData.message) {
+          errorMsg = errorData.message;
+        }
       } catch {
         // fallback to status text
       }

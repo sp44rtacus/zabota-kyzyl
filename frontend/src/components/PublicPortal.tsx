@@ -142,10 +142,12 @@ export const PublicPortal: React.FC<PublicPortalProps> = ({ onGoToTrack, onGoToW
     e.preventDefault();
     setFormError(null);
 
-    if (!applicantName.trim() || !phone.trim() || !address.trim() || !description.trim()) {
-      setFormError("Пожалуйста, заполните все обязательные поля формы.");
+    if (!applicantName.trim() || !phone.trim() || !address.trim()) {
+      setFormError("Пожалуйста, укажите ФИО, телефон и точный адрес.");
       return;
     }
+
+    const finalDescription = description.trim() || (audioBlob ? "Голосовое обращение жителя" : "Требуется адресная социальная помощь");
 
     setSubmitting(true);
     try {
@@ -159,7 +161,7 @@ export const PublicPortal: React.FC<PublicPortalProps> = ({ onGoToTrack, onGoToW
         formData.append('district_id', districtId.toString());
         formData.append('address', address.trim());
         formData.append('category_id', categoryId.toString());
-        formData.append('description', description.trim());
+        formData.append('description', finalDescription);
         formData.append('is_emergency', isEmergency ? 'true' : 'false');
         formData.append('audio_file', audioBlob, 'voice_request.webm');
 
@@ -175,7 +177,7 @@ export const PublicPortal: React.FC<PublicPortalProps> = ({ onGoToTrack, onGoToW
           district_id: districtId,
           address: address.trim(),
           category_id: categoryId,
-          description: description.trim(),
+          description: finalDescription,
           is_emergency: isEmergency
         });
         setCreatedUin(res.uin);
@@ -521,17 +523,16 @@ export const PublicPortal: React.FC<PublicPortalProps> = ({ onGoToTrack, onGoToW
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  Подробное описание ситуации *
+                  Описание ситуации (или надиктуйте голосом)
                 </label>
-                <span className="text-xs text-slate-400">или надиктуйте голосом</span>
+                <span className="text-xs text-slate-400">необязательно, если записан голос</span>
               </div>
 
               <textarea
-                required
                 rows={3}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Опишите, какая требуется помощь (например: не могу выйти из дома из-за сугроба у крыльца, печь остывает)..."
+                placeholder="Опишите, какая требуется помощь (например: не могу выйти из дома из-за сугроба у крыльца, привезти дрова, продукты)..."
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-municipal-600"
               />
 

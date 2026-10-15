@@ -19,8 +19,23 @@ export const App: React.FC = () => {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
 
   useEffect(() => {
-    // Проверка сохраненной сессии
-    if (api.getToken()) {
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab');
+    const roleParam = params.get('role') as Role | null;
+
+    if (tabParam) {
+      setCurrentTab(tabParam);
+    }
+
+    if (roleParam) {
+      api.quickLogin(roleParam)
+        .then(() => api.getMe())
+        .then(user => {
+          setCurrentUser(user);
+          if (tabParam) setCurrentTab(tabParam);
+        })
+        .catch(console.error);
+    } else if (api.getToken()) {
       api.getMe()
         .then(user => setCurrentUser(user))
         .catch(() => api.logout());
